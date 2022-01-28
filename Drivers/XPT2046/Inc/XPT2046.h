@@ -10,7 +10,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "../Src/XPT2046.c"
-
+#include <stdint.h>
 
 /* Private macros ------------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
@@ -18,7 +18,9 @@
 void XPT2046_SPI_send(uint8_t data);
 void XPT2046_Select();
 void XPT2046_Deselect();
-void XPT2046_SPI_Transmit_Receive(uint8_t data_in, uint16_t * data_out);
+
+void XPT2046_SPI_Transmit_Receive(uint8_t data_in, uint16_t *data_out);
+
 /*блокирующая функция - нужна для передачи управления другому потоку при ожидании касания */
 void XPT2046_Wait(uint32_t timeout);
 /*колбеки для реакции на касание и отпускание тача */
@@ -29,6 +31,6 @@ void touch_Released(uint32_t duration);
 void XPT2046_init(uint16_t displayWidth, uint16_t displayHeight, int16_t displayLeft, int16_t displayBottom);
 void XPT2046_clearCalibrationData();
 uint32_t XPT2046_GetTouchPressDuration();
-void XPT2046_PEN_Interrupt_Callback();
-
+void XPT2046_PEN_DOWN_Interrupt_Callback();
+void XPT2046_PEN_UP_Interrupt_Callback();
 #endif /* XPT2046_INC_XPT2046_H_ */

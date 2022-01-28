@@ -6,7 +6,7 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-#include "XPT2046.h"
+#include "../Inc/XPT2046.h"
 /* Private types -------------------------------------------------------------*/
 typedef struct Point {
 	int x;
@@ -157,7 +157,7 @@ void pointToScreen(){
 uint16_t XPT2046_SingleScan(uint8_t coord){
 	uint16_t res;
 	XPT2046_Select();
-	XPT2046_SPI_Transmit_Receive(CONTROL_STARTBIT | coord, &res);
+	XPT2046_SPI_Transmit_Receive(CONTROL_STARTBIT | CONTROL_MODE_REF_ON_ADC_ON |coord, &res);
 	XPT2046_Deselect();
 	return res>>3;
 }
@@ -169,13 +169,14 @@ float min(float a, float b)
 {
 	if (a<b) {return a;} else {return b;}
 }
-void XPT2046_PEN_Interrupt_Callback(){
+/*Сработка при нажатии на тач*/
+void XPT2046_PEN_DOWN_Interrupt_Callback(){
 	_isWaiting = 0;
 	_xRawFiltered = 0.0;
 	_yRawFiltered = 0.0;
 	_z1RawFiltered = 0.0;
 	_z2RawFiltered = 0.0;
-	uint8_t maxScans = 1000;
+	uint8_t maxScans = 10;
 	while(maxScans > 0){
 	maxScans--;
 	_xRaw =  XPT2046_SingleScan(CONTROL_CHANNEL_X);
@@ -183,17 +184,19 @@ void XPT2046_PEN_Interrupt_Callback(){
 	_z1Raw = XPT2046_SingleScan(CONTROL_CHANNEL_Z1);
 	_z2Raw = XPT2046_SingleScan(CONTROL_CHANNEL_Z2);
 	/*усреднение точек данных*/
-	_xRawFiltered = _xRawFiltered*0.98 + _xRaw	*0.02;
-	_yRawFiltered = _yRawFiltered*0.98 + _yRaw	*0.02;
-	_z1RawFiltered = _z1RawFiltered*0.98 + _z1Raw*0.02;
-	_z2RawFiltered = _z2RawFiltered*0.98 + _z2Raw*0.02;
+	_xRawFiltered = _xRawFiltered*0.75 + _xRaw	*0.25;
+	_yRawFiltered = _yRawFiltered*0.75 + _yRaw	*0.25;
+	_z1RawFiltered = _z1RawFiltered*0.75 + _z1Raw*0.25;
+	_z2RawFiltered = _z2RawFiltered*0.75 + _z2Raw*0.25;
 	_deltaX=_xRawFiltered - _xRawFilteredOld;
 	_deltaY=_yRawFiltered - _yRawFilteredOld;
 	_deltaZ1=_z1RawFiltered - _z1RawFilteredOld;
 	_deltaZ2=_z2RawFiltered - _z2RawFilteredOld;
-	if (_deltaX < 15.0 && _deltaY < 15.0) // pointFix
-	{maxScans = 0;}
+	if (_deltaX < 1.0 && _deltaY < 1.0) // pointFix
+	{maxScans = 0;
+		}
 	}
+
 
 	if (max(_z1RawFiltered,_z2RawFiltered) - min(_z1RawFiltered,_z2RawFiltered) < 200 ) //нажали не ногой
 		if (_typeOfPoint == POINT_USER){
@@ -205,6 +208,10 @@ void XPT2046_PEN_Interrupt_Callback(){
 			_referencePoints[_typeOfPoint].yADC = (uint16_t) _yRawFiltered;
 		}
 
+}
+/*реакция на отпускание тача*/
+void XPT2046_PEN_UP_Interrupt_Callback(){
+	touch_Released(0);
 }
 
 /*определение расстояия между заявленным касанием и фактическим*/

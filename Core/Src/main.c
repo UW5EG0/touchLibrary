@@ -21,6 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+//#include "ssd1306.h"
+#include <stdint.h>
+#include <stdio.h>
 #include "XPT2046.h"
 /* USER CODE END Includes */
 
@@ -41,14 +44,17 @@
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi2;
 
-/* USER CODE BEGIN PV */
+UART_HandleTypeDef huart1;
 
+/* USER CODE BEGIN PV */
+char status[64];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI2_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -58,20 +64,31 @@ static void MX_SPI2_Init(void);
 // Реализуем абстрагированные функции для подключения к лапалке
 //Chip Select
 void XPT2046_Select(){
-HAL_GPIO_WritePin(XPT2046_CS_GPIO_Port, XPT2046_CS_Pin, GPIO_PIN_SET);
+HAL_GPIO_WritePin(XPT2046_CS_GPIO_Port, XPT2046_CS_Pin, GPIO_PIN_RESET);
 }
 void XPT2046_Deselect(){
-	HAL_GPIO_WritePin(XPT2046_CS_GPIO_Port, XPT2046_CS_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(XPT2046_CS_GPIO_Port, XPT2046_CS_Pin, GPIO_PIN_SET);
 }
 // Шлём байт и ничего не ждём
 void XPT2046_SPI_send(uint8_t data) {
+	sprintf(status,"SPI SEND, %x\n", data);
+	HAL_UART_Transmit(&huart1, &status, strlen(status), 1000);
+
 	HAL_SPI_Transmit(&hspi2, &data, 1, 1000);
 }
 // Шлём байт - ловим два, пакуем как одно число и в дело
-void XPT2046_SPI_Transmit_Receive(uint8_t data_in, uint16_t * data_out) {
+void XPT2046_SPI_Transmit_Receive(uint8_t data_in, uint16_t *data_out) {
 	uint8_t data[2] = {0,0};
+	uint16_t datatmp;
+//	sprintf(status,"SPI SEND, %x\n", data_in);
+//	HAL_UART_Transmit(&huart1, status, strlen(status), 1000);
 	HAL_SPI_TransmitReceive(&hspi2, &data_in, data, 2, 1000);
-	data_out = data[1] << 8 + data[0];
+	datatmp =  data[1] * 256 + data[0];
+	*data_out = datatmp;
+	//sprintf(status,"SPI RECEIVE, %x\n", datatmp);
+
+	//HAL_UART_Transmit(&huart1, status, strlen(status), 1000);
+
 }
 // Если в ОСРВ - то тут должен быть delay ОСРВ для передачи выполнения другому потоку
 void XPT2046_Wait(uint32_t timeout){
@@ -82,11 +99,23 @@ void XPT2046_Wait(uint32_t timeout){
 /*реакция на касание*/
 void touch_Pressed(uint16_t x, uint16_t y) {
 	/*шота делать на экране*/
-	HAL_GPIO_TogglePin(LED_B_GPIO_Port, LED_B_Pin);
+	sprintf(status,"pressed, %04i (%f), %04i (%f)\n",_xRaw,_xRawFiltered,_yRaw,_yRawFiltered);
+		HAL_UART_Transmit(&huart1, &status, strlen(status), 1000);
+
+HAL_GPIO_WritePin(LED_B_GPIO_Port, LED_B_Pin, GPIO_PIN_RESET);
 }
-void touchISR(){
-	XPT2046_PEN_Interrupt_Callback();
+
+/*реакция на касание*/
+void touch_Released(uint32_t duration) {
+	/*шота делать на экране*/
+	sprintf(status,"released, %08ld\n", duration);
+	HAL_UART_Transmit(&huart1, &status, 20, 1000);
+
+	HAL_GPIO_WritePin(LED_B_GPIO_Port, LED_B_Pin, GPIO_PIN_SET);
 }
+
+/*Реакция на отпускание*/
+
 /* USER CODE END 0 */
 
 /**
@@ -118,7 +147,19 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI2_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  //HAL_Delay(500);
+
+  //ssd1306_Init();
+  //ssd1306_FlipScreenVertically();
+  //ssd1306_UpdateScreen();
+  sprintf(status,"Cable connected");
+  //ssd1306_Clear();
+    //   ssd1306_SetColor(White);
+    //ssd1306_SetCursor(00, 0);
+    //ssd1306_WriteString(status, Font_7x8);
+  //ssd1306_UpdateScreen();
   XPT2046_init(800, 480, 0,0); //инициализируем либу тача размером дисплея
   XPT2046_clearCalibrationData(); //трём старые данные калибровки
  /* for (char i = 0; i < 5; i++) // что-то натужно калибруемся...
@@ -141,9 +182,19 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  	// uint8_t addr = 0;
   while (1)
   {
-	  HAL_Delay(100);
+	  HAL_Delay(50);
+
+	 /* while(HAL_I2C_GetState(&SSD1306_I2C_PORT) != HAL_I2C_STATE_READY);
+	  	HAL_I2C_Mem_Write_DMA(&SSD1306_I2C_PORT, addr++, 0x00, 1, 0x00, 1);
+	  	addr %=256;*/
+	/*  ssd1306_Clear();
+	       ssd1306_SetColor(White);
+	    ssd1306_SetCursor(00, 0);
+	    ssd1306_WriteString(status, Font_7x8);
+	  ssd1306_UpdateScreen();*/
 	//  HAL_GPIO_TogglePin(LED_A_GPIO_Port, LED_A_Pin);
     /* USER CODE END WHILE */
 
@@ -221,7 +272,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -233,6 +284,39 @@ static void MX_SPI2_Init(void)
   /* USER CODE BEGIN SPI2_Init 2 */
 
   /* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
 
 }
 
@@ -253,7 +337,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LED_A_Pin|LED_B_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LED_A_Pin|LED_B_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(XPT2046_CS_GPIO_Port, XPT2046_CS_Pin, GPIO_PIN_RESET);
@@ -261,7 +345,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pins : KEY_0_Pin KEY_1_Pin */
   GPIO_InitStruct.Pin = KEY_0_Pin|KEY_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LED_A_Pin LED_B_Pin */
@@ -274,7 +358,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : TOUCH_PENIRQ_Pin */
   GPIO_InitStruct.Pin = TOUCH_PENIRQ_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(TOUCH_PENIRQ_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : XPT2046_CS_Pin */

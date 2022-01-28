@@ -223,6 +223,7 @@ void EXTI4_IRQHandler(void)
   /* USER CODE END EXTI4_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(KEY_1_Pin);
   /* USER CODE BEGIN EXTI4_IRQn 1 */
+  HAL_GPIO_TogglePin(LED_B_GPIO_Port, LED_B_Pin);
 
   /* USER CODE END EXTI4_IRQn 1 */
 }
@@ -233,13 +234,19 @@ void EXTI4_IRQHandler(void)
 void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
-	  HAL_GPIO_TogglePin(LED_B_GPIO_Port, LED_B_Pin);
+
 
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(TOUCH_PENIRQ_Pin);
   /* USER CODE BEGIN EXTI9_5_IRQn 1 */
-  //Реагируем на событие от тача своим событием
-  XPT2046_PEN_Interrupt_Callback();
+  if (HAL_GPIO_ReadPin(TOUCH_PENIRQ_GPIO_Port, TOUCH_PENIRQ_Pin) == GPIO_PIN_RESET)
+  //Реагируем на события от тача своим событием
+   {
+	  XPT2046_PEN_DOWN_Interrupt_Callback();}
+  else
+  { XPT2046_PEN_UP_Interrupt_Callback();
+  }
+
   /* USER CODE END EXTI9_5_IRQn 1 */
 }
 
