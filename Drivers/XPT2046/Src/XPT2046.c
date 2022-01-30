@@ -6,7 +6,9 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-#include "../Inc/XPT2046.h"
+
+#include "main.h"
+
 /* Private types -------------------------------------------------------------*/
 typedef struct Point {
 	int x;
@@ -38,6 +40,33 @@ typedef struct ReferencePoint {
 #define CONTROL_MODE_REF_ON_ADC_OFF	0b00000010
 #define CONTROL_MODE_REF_ON_ADC_ON	0b00000011
 
+#define _XTLT (_referencePoints[POINT_TOPLEFT].xADC)  /*X of Top Left Touch*/
+#define _XTLS (_referencePoints[POINT_TOPLEFT].xDisplay)  /*X of Top Left Screen*/
+#define _YTLT (_referencePoints[POINT_TOPLEFT].yADC)  /*Y of Top Left Touch*/
+#define _YTLS (_referencePoints[POINT_TOPLEFT].yDisplay)  /*Y of Top Left Screen*/
+
+#define _XTRT (_referencePoints[POINT_TOPRIGHT].xADC)  /*X of Top Right Touch*/
+#define _XTRS (_referencePoints[POINT_TOPRIGHT].xDisplay)  /*X of Top Right Screen*/
+#define _YTRT (_referencePoints[POINT_TOPRIGHT].yADC)  /*Y of Top Right Touch*/
+#define _YTRS (_referencePoints[POINT_TOPRIGHT].yDisplay)  /*Y of Top Right Screen*/
+
+#define _XBLT (_referencePoints[POINT_BOTTOMLEFT].xADC)  /*X of Bottom Left Touch*/
+#define _XBLS (_referencePoints[POINT_BOTTOMLEFT].xDisplay)  /*X of Bottom Left Screen*/
+#define _YBLT (_referencePoints[POINT_BOTTOMLEFT].yADC)  /*Y of Bottom Left Touch*/
+#define _YBLS (_referencePoints[POINT_BOTTOMLEFT].yDisplay)  /*Y of Bottom Left Screen*/
+
+#define _XBRT (_referencePoints[POINT_BOTTOMRIGHT].xADC)  /*X of Bottom Right Touch*/
+#define _XBRS (_referencePoints[POINT_BOTTOMRIGHT].xDisplay)  /*X of Bottom Right Screen*/
+#define _YBRT (_referencePoints[POINT_BOTTOMRIGHT].yADC)  /*Y of Bottom Right Touch*/
+#define _YBRS (_referencePoints[POINT_BOTTOMRIGHT].yDisplay)  /*Y of Bottom Right Screen*/
+
+#define _XCT (_referencePoints[POINT_CENTER].xADC)  /*X of Center Touch*/
+#define _XCS (_referencePoints[POINT_CENTER].xDisplay)  /*X of Center Screen*/
+#define _YCT (_referencePoints[POINT_CENTER].yADC)  /*Y of Center Touch*/
+#define _YCS (_referencePoints[POINT_CENTER].yDisplay)  /*Y of Center Screen*/
+
+#define XPT2046_OK 0
+#define XPT2046_ERR 1
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 
@@ -59,6 +88,9 @@ uint16_t _displayHeight;
 int16_t _displayBottom;
 int16_t _displayLeft;
 
+
+
+
 //чистые значения того, что было замеренно
 uint16_t _xRaw;
 uint16_t _yRaw;
@@ -76,11 +108,20 @@ float _xRawFilteredOld;
 float _yRawFilteredOld;
 float _z1RawFilteredOld;
 float _z2RawFilteredOld;
+float _xStep;
+float _yStep;
+int16_t _xRawOnZeroPoint;
+int16_t _yRawOnZeroPoint;
+
 int16_t _xDisplay;
 int16_t _yDisplay;
 uint8_t _isWaiting = 0;
 int8_t _typeOfPoint;
-uint32_t touchPressMoment;
+
+//
+uint32_t _startTouchTickMS;
+uint32_t _endTouchTickMS;
+uint32_t _lastTouchDuration;
 
 ref_point_t _referencePoints[5]; //контрольные точки для калибровки
 
@@ -92,6 +133,18 @@ typedef enum {
 	POINT_BOTTOMLEFT,
 	POINT_BOTTOMRIGHT} reference_points;
 /* Private function prototypes -----------------------------------------------*/
+	/*Методы, что надо реализовать на стороне юзера*/
+	void XPT2046_SPI_send(uint8_t data);
+	void XPT2046_Select();
+	void XPT2046_Deselect();
+	uint32_t XPT2046_GetTick();
+	void XPT2046_SPI_Transmit_Receive(uint8_t data_in, uint16_t *data_out);
+
+	/*блокирующая функция - нужна для передачи управления другому потоку при ожидании касания */
+	void XPT2046_Wait(uint32_t timeout);
+	/*колбеки для реакции на касание и отпускание тача */
+	void touch_Pressed(uint16_t x, uint16_t y);
+	void touch_Released(uint32_t duration);
 /* Private functions ---------------------------------------------------------*/
 
 void XPT2046_init(uint16_t displayWidth, uint16_t displayHeight, int16_t displayLeft, int16_t displayBottom) {
@@ -109,6 +162,7 @@ void XPT2046_init(uint16_t displayWidth, uint16_t displayHeight, int16_t display
 	XPT2046_Deselect();
 	XPT2046_Wait(1000);
 }
+
 /**
  * Сброс калибровки тача на условно заводские настройки - в зависимости от предзаводских испытаний - менять по усмотрению
  **/
@@ -149,17 +203,20 @@ void XPT2046_waitForCalibrationPoint(uint8_t pointIndex, uint16_t xDisplay, uint
     	XPT2046_Wait(100);
     }
 }
-/**/
-void pointToScreen(){
-
+/*Пересчет координат */
+void XPT2046_pointToScreen(){
+	_xDisplay = _displayLeft + (_xRawFiltered-_xRawOnZeroPoint)/_xStep;
+	_yDisplay = _displayBottom + (_yRawFiltered-_yRawOnZeroPoint)/_yStep;
 }
+
 
 uint16_t XPT2046_SingleScan(uint8_t coord){
 	uint16_t res;
 	XPT2046_Select();
 	XPT2046_SPI_Transmit_Receive(CONTROL_STARTBIT | CONTROL_MODE_REF_ON_ADC_ON |coord, &res);
 	XPT2046_Deselect();
-	return res>>3;
+	res >>= 3;
+	return res;
 }
 float max(float a, float b)
 {
@@ -171,12 +228,13 @@ float min(float a, float b)
 }
 /*Сработка при нажатии на тач*/
 void XPT2046_PEN_DOWN_Interrupt_Callback(){
+	_startTouchTickMS = XPT2046_GetTick();
 	_isWaiting = 0;
 	_xRawFiltered = 0.0;
 	_yRawFiltered = 0.0;
 	_z1RawFiltered = 0.0;
 	_z2RawFiltered = 0.0;
-	uint8_t maxScans = 10;
+	uint8_t maxScans = 100;
 	while(maxScans > 0){
 	maxScans--;
 	_xRaw =  XPT2046_SingleScan(CONTROL_CHANNEL_X);
@@ -196,22 +254,43 @@ void XPT2046_PEN_DOWN_Interrupt_Callback(){
 	{maxScans = 0;
 		}
 	}
-
-
 	if (max(_z1RawFiltered,_z2RawFiltered) - min(_z1RawFiltered,_z2RawFiltered) < 200 ) //нажали не ногой
+		{
 		if (_typeOfPoint == POINT_USER){
-			pointToScreen();
+			XPT2046_pointToScreen();
 			touch_Pressed(_xDisplay, _yDisplay);
 		}
 		else {
 			_referencePoints[_typeOfPoint].xADC = (uint16_t) _xRawFiltered;
 			_referencePoints[_typeOfPoint].yADC = (uint16_t) _yRawFiltered;
 		}
-
+	}
 }
 /*реакция на отпускание тача*/
 void XPT2046_PEN_UP_Interrupt_Callback(){
-	touch_Released(0);
+	_endTouchTickMS = XPT2046_GetTick();
+	_lastTouchDuration = _endTouchTickMS - _startTouchTickMS;
+	touch_Released(_lastTouchDuration);
+}
+/*Принудительная установка точек калибровки*/
+void XPT2046_directSetCalibrationPoint(uint8_t pointIndex, int16_t xDisplay, int16_t yDisplay, uint16_t xADC, uint16_t yADC){
+	if (pointIndex >=POINT_CENTER && pointIndex <= POINT_BOTTOMRIGHT){
+		_referencePoints[pointIndex].xDisplay = xDisplay;
+		_referencePoints[pointIndex].yDisplay = yDisplay;
+		_referencePoints[pointIndex].xADC = xADC;
+		_referencePoints[pointIndex].yADC = yADC;
+	}
+}
+/*На основании данных калибровочных точек определяем коэфициенты*/
+uint8_t XPT2046_updateCalibrationParameters(){
+
+
+	_xStep = ((_XTLT - _XBRT)+(_XTRT - _XBLT))/((_XTLS - _XBRS)+(_XTRS - _XBLS));
+	_yStep = ((_YTLT - _YBRT)+(_YTRT - _YBLT))/((_YTLS - _YBRS)+(_YTRS - _YBLS));
+	_xRawOnZeroPoint = (_XCT-(_xStep * (_XCS-_displayLeft)));
+	_yRawOnZeroPoint = (_YCT-(_yStep * (_YCS-_displayBottom)));
+
+	return XPT2046_OK;
 }
 
 /*определение расстояия между заявленным касанием и фактическим*/

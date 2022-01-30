@@ -24,6 +24,7 @@
 //#include "ssd1306.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include "XPT2046.h"
 /* USER CODE END Includes */
 
@@ -72,7 +73,7 @@ void XPT2046_Deselect(){
 // Шлём байт и ничего не ждём
 void XPT2046_SPI_send(uint8_t data) {
 	sprintf(status,"SPI SEND, %x\n", data);
-	HAL_UART_Transmit(&huart1, &status, strlen(status), 1000);
+	HAL_UART_Transmit(&huart1, status, strlen(status), 1000);
 
 	HAL_SPI_Transmit(&hspi2, &data, 1, 1000);
 }
@@ -95,6 +96,9 @@ void XPT2046_Wait(uint32_t timeout){
 	HAL_Delay(timeout);
 	HAL_GPIO_TogglePin(LED_A_GPIO_Port, LED_A_Pin);
 
+}
+uint32_t XPT2046_GetTick(){
+ return	HAL_GetTick();
 }
 /*реакция на касание*/
 void touch_Pressed(uint16_t x, uint16_t y) {
@@ -171,7 +175,9 @@ int main(void)
 	  case POINT_BOTTOMLEFT: XPT2046_waitForCalibrationPoint(i,10,10); break;
 	  case POINT_BOTTOMRIGHT: XPT2046_waitForCalibrationPoint(i,790,10); break;
 	  	  }
-  }*/
+  }
+  XPT2046_updateCalibrationParameters();
+  */
   	 if (XPT2046_testCalibrationPoint(POINT_CENTER) < 3) {
   		 // alert "Calibration OK"
   	 }
