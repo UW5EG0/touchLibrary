@@ -25,7 +25,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "XPT2046.h"
+#include "XPT2046.c"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,11 +44,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c2;
-DMA_HandleTypeDef hdma_i2c2_tx;
 
 SPI_HandleTypeDef hspi2;
-
-UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 char status[64];
@@ -58,9 +55,7 @@ char status[64];
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI2_Init(void);
-static void MX_DMA_Init(void);
 static void MX_I2C2_Init(void);
-static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -93,59 +88,52 @@ void XPT2046_SPI_Transmit_Receive(uint8_t data_in, uint16_t *data_out) {
 // Если в ОСРВ - то тут должен быть delay ОСРВ для передачи выполнения другому потоку
 void XPT2046_Wait(uint32_t timeout){
 	HAL_Delay(timeout);
-	HAL_GPIO_TogglePin(LED_A_GPIO_Port, LED_A_Pin);
-
 }
+/*время в МКС для неблокирующего определения длительности */
 uint32_t XPT2046_GetTick(){
  return	HAL_GetTick();
 }
-/*вызывается 1 раз после инициализации шины*/
+/*Включаем обработку касания тача*/
 void XPT2046_Enable_Interrupt() {
    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
-/*вызывается 1 раз после инициализации шины*/
+/*Выключаем обработку касания тача*/
 void XPT2046_Disable_Interrupt() {
    HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
 }
 /*реакция на касание*/
 void touch_Pressed(uint16_t x, uint16_t y) {
-	/*шота делать на экране*/
-	sprintf(status,"pressed, %04i (%f), %04i (%f)",_xRaw,_xRawFiltered,_yRaw,_yRawFiltered);
-	//HAL_UART_Transmit(&huart1, (uint8_t *)status, strlen(status), 1000);
+	/*выводим координаты на экран*/
 	ssd1306_Clear();
 	ssd1306_SetColor(White);
-	      ssd1306_SetCursor(0, 0);
-	      sprintf(status,"pressed");// , %04i (%f), %04i (%f)",_xRaw,_xRawFiltered,_yRaw,_yRawFiltered);
+	ssd1306_SetCursor(0, 0);
 
-	      ssd1306_WriteString(status, Font_7x8);
-	      ssd1306_SetCursor(0, 9);
-	      sprintf(status,"x %04i (%f)",x,_xRawFiltered);
-	      ssd1306_WriteString(status, Font_7x8);
+	sprintf(status,"pressed"); //Событие "Нажали"
+	ssd1306_WriteString(status, Font_7x8);
 
-	      ssd1306_SetCursor(0, 18);
-	      sprintf(status,"y %04i (%f)",y,_yRawFiltered);
-	      ssd1306_WriteString(status, Font_7x8);
+	ssd1306_SetCursor(0, 9);
+	sprintf(status,"X %4i (%f)",x,_xRawFiltered); // Замеры координаты X в пикселях экрана и усредненный результат замера
+	ssd1306_WriteString(status, Font_7x8);
 
-		  ssd1306_UpdateScreen();
+	ssd1306_SetCursor(0, 18);
+    sprintf(status,"Y %4i (%f)",y,_yRawFiltered); // Замеры координаты Y в пикселях экрана и усредненный результат замера
+    ssd1306_WriteString(status, Font_7x8);
 
-HAL_GPIO_WritePin(LED_B_GPIO_Port, LED_B_Pin, GPIO_PIN_RESET);
+    ssd1306_UpdateScreen();
+    HAL_GPIO_WritePin(LED_B_GPIO_Port, LED_B_Pin, GPIO_PIN_RESET); //Зажигаем контрольный светодиод
 }
 
-/*реакция на касание*/
+/*реакция на отпускание тача*/
 void touch_Released(uint32_t duration) {
-	/*шота делать на экране*/
 	sprintf(status,"released, %08ld\n", duration);
-//	HAL_UART_Transmit(&huart1, (uint8_t *)status, strlen(status), 1000);
 	ssd1306_Clear();
-	      ssd1306_SetColor(White);
-	      ssd1306_SetCursor(0, 0);
-	      ssd1306_WriteString(status, Font_7x8);
-		  ssd1306_UpdateScreen();
+	ssd1306_SetColor(White);
+    ssd1306_SetCursor(0, 0);
+    ssd1306_WriteString(status, Font_7x8);
+    ssd1306_UpdateScreen();
 
-	HAL_GPIO_WritePin(LED_B_GPIO_Port, LED_B_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(LED_B_GPIO_Port, LED_B_Pin, GPIO_PIN_SET); //Гасим контрольный светодиод
 }
-
-/*Реакция на отпускание*/
 
 /* USER CODE END 0 */
 
@@ -178,9 +166,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI2_Init();
-  MX_DMA_Init();
   MX_I2C2_Init();
-  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_Delay(500);
 
@@ -196,36 +182,18 @@ int main(void)
   HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
   XPT2046_init(800, 480, 0,0); //инициализируем либу тача размером дисплея
   XPT2046_clearCalibrationData(); //трём старые данные калибровки
-  /*for (char i = 0; i < 5; i++) // что-то натужно калибруемся...
-  {
-	  switch (i) {
-	  case POINT_CENTER: XPT2046_waitForCalibrationPoint(i,400,240); break;
-	  case POINT_TOPLEFT: XPT2046_waitForCalibrationPoint(i,10,470); break;
-	  case POINT_TOPRIGHT: XPT2046_waitForCalibrationPoint(i,790,470); break;
-	  case POINT_BOTTOMLEFT: XPT2046_waitForCalibrationPoint(i,10,10); break;
-	  case POINT_BOTTOMRIGHT: XPT2046_waitForCalibrationPoint(i,790,10); break;
-	  	  }
-  }
-*/
+
 
   XPT2046_updateCalibrationParameters();
-  	 if (XPT2046_testCalibrationPoint(POINT_CENTER) < 3) {
-  		 // alert "Calibration OK"
-  	 }
-
 
   /**/
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  	// uint8_t addr = 0;
-  while (1)
+   while (1)
   {
 	  HAL_Delay(50);
-	//  ssd1306_Clear();
-	  ssd1306_WriteString(status, Font_7x8);
-	  ssd1306_UpdateScreen();
 	  HAL_GPIO_TogglePin(LED_A_GPIO_Port, LED_A_Pin);
     /* USER CODE END WHILE */
 
@@ -349,55 +317,6 @@ static void MX_SPI2_Init(void)
   /* USER CODE BEGIN SPI2_Init 2 */
 
   /* USER CODE END SPI2_Init 2 */
-
-}
-
-/**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
-
-}
-
-/**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Stream7_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream7_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream7_IRQn);
 
 }
 

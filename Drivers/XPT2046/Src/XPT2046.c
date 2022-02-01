@@ -7,7 +7,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 
-#include "main.h"
+#include "XPT2046.h"
 
 /* Private types -------------------------------------------------------------*/
 typedef struct Point {
@@ -268,7 +268,9 @@ void XPT2046_PEN_DOWN_Interrupt_Callback(){
 		}
 	}
 	}
-	if (max(_z1RawFiltered,_z2RawFiltered) - min(_z1RawFiltered,_z2RawFiltered) < 200 || NO_PRESSURE_CHECK) //нажали не ногой
+	if (((max(_z1RawFiltered,_z2RawFiltered) - min(_z1RawFiltered,_z2RawFiltered) < 200)
+		&& (max(_z1RawFiltered,_z2RawFiltered) - min(_z1RawFiltered,_z2RawFiltered) > 3))
+		|| NO_PRESSURE_CHECK) //нажали не ногой и не отпустили
 		{
 		if (_typeOfPoint == POINT_USER){
 			XPT2046_pointToScreen();
@@ -298,8 +300,6 @@ void XPT2046_directSetCalibrationPoint(uint8_t pointIndex, int16_t xDisplay, int
 }
 /*На основании данных калибровочных точек определяем коэфициенты*/
 uint8_t XPT2046_updateCalibrationParameters(){
-
-
 	_xStep = (float)((_XBRT -_XTLT)+(_XTRT - _XBLT))/ (float)((_XBRS - _XTLS)+(_XTRS - _XBLS));
 	_yStep = (float)((_YTLT - _YBRT)+(_YTRT - _YBLT))/ (float)((_YTLS - _YBRS)+(_YTRS - _YBLS));
 	_xRawOnZeroPoint = (_XCT-(_xStep * (_XCS-_displayLeft)));
