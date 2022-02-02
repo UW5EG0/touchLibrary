@@ -234,7 +234,26 @@ void EXTI4_IRQHandler(void)
 void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
-
+	 /* tick = get_tick();
+	   * if PIN is RISE
+	   *    HI_tick = tick
+	   *    else
+	   *    LO_tick = tick
+	   *
+	   *    If (PIN IS FALL)
+	   *    {
+	   *       IF LO_tick - HI_tick > 20 // 20ms - ну явно отпустили
+	   *         XPT2046_PEN_DOWN_Interrupt_Callback();
+	   *       else
+	   *         XPT2046_PEN_STILL_Interrupt_Callback();
+	   *    }
+	   *    if (PIN IS RISE)
+	   *       {delay(5)
+	   *       if PIN STILL RISE
+	   *       	  XPT2046_PEN_UP_Interrupt_Callback();
+	   *       }
+	   *
+		*/
 
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(TOUCH_PENIRQ_Pin);
@@ -245,7 +264,7 @@ void EXTI9_5_IRQHandler(void)
    {
 	  XPT2046_PEN_DOWN_Interrupt_Callback();}
   else
-  { XPT2046_PEN_UP_Interrupt_Callback();
+  {XPT2046_PEN_UP_Interrupt_Callback();
   }
 
   /* USER CODE END EXTI9_5_IRQn 1 */
