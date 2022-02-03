@@ -93,6 +93,11 @@ void XPT2046_Wait(uint32_t timeout){
 uint32_t XPT2046_GetTick(){
  return	HAL_GetTick();
 }
+/*статус ноги прерывания */
+GPIO_PinState XPT2046_GetIRQPinState()
+{
+	return HAL_GPIO_ReadPin(TOUCH_PENIRQ_GPIO_Port, TOUCH_PENIRQ_Pin);
+}
 /*Включаем обработку касания тача*/
 void XPT2046_Enable_Interrupt() {
    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);

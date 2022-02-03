@@ -22,4 +22,5 @@ uint8_t XPT2046_updateCalibrationParameters();
 uint32_t XPT2046_GetTouchPressDuration();
 void XPT2046_PEN_DOWN_Interrupt_Callback();
 void XPT2046_PEN_UP_Interrupt_Callback();
+void XPT2046_unified_Interrupt_Callback(GPIO_PinState IRQPinStatus, uint32_t IRQMomentTick);
 #endif /* XPT2046_INC_XPT2046_H_ */

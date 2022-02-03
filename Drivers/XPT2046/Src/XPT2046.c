@@ -128,6 +128,9 @@ int8_t _typeOfPoint;
 uint32_t _startTouchTickMS;
 uint32_t _endTouchTickMS;
 uint32_t _lastTouchDuration;
+uint32_t _riseTick;
+uint32_t _fallTick;
+
 
 ref_point_t _referencePoints[5]; //контрольные точки для калибровки
 
@@ -145,6 +148,7 @@ typedef enum {
 	void XPT2046_Select();
 	void XPT2046_Deselect();
 	uint32_t XPT2046_GetTick();
+	GPIO_PinState XPT2046_GetIRQPinState();
 	void XPT2046_SPI_Transmit_Receive(uint8_t data_in, uint16_t *data_out);
 
 	/*блокирующая функция - нужна для передачи управления другому потоку при ожидании касания */
@@ -289,6 +293,10 @@ void XPT2046_PEN_UP_Interrupt_Callback(){
 	_lastTouchDuration = _endTouchTickMS - _startTouchTickMS;
 	touch_Released(_lastTouchDuration);
 }
+void XPT2046_PEN_STILL_Interrupt_Callback() {
+	_endTouchTickMS = XPT2046_GetTick();
+	_lastTouchDuration = _endTouchTickMS - _startTouchTickMS;
+}
 /*Принудительная установка точек калибровки*/
 void XPT2046_directSetCalibrationPoint(uint8_t pointIndex, int16_t xDisplay, int16_t yDisplay, uint16_t xADC, uint16_t yADC){
 	if (pointIndex >=POINT_CENTER && pointIndex <= POINT_BOTTOMRIGHT){
@@ -310,6 +318,20 @@ uint8_t XPT2046_updateCalibrationParameters(){
 uint32_t XPT2046_GetTouchPressDuration(){
   return XPT2046_GetTick() - _startTouchTickMS;
 }
+
+void XPT2046_unified_Interrupt_Callback(GPIO_PinState IRQPinStatus, uint32_t IRQMomentTick){
+	if (IRQPinStatus) {
+		_riseTick = IRQMomentTick;
+	} else {
+		_fallTick = IRQMomentTick;
+		if (_fallTick - _riseTick > 20){
+			XPT2046_PEN_DOWN_Interrupt_Callback();
+		} else {
+			XPT2046_PEN_STILL_Interrupt_Callback();
+		}
+	}
+}
+
 /*определение расстояия между заявленным касанием и фактическим*/
 uint16_t XPT2046_testCalibrationPoint(uint8_t pointIndex) {
 	return 0;

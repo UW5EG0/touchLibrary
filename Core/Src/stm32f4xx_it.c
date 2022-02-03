@@ -46,7 +46,7 @@
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
-
+void XPT2046_unified_Interrupt_Callback(GPIO_PinState IRQPinStatus, uint32_t IRQMomentTick);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -234,6 +234,8 @@ void EXTI4_IRQHandler(void)
 void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
+	XPT2046_unified_Interrupt_Callback(HAL_GPIO_ReadPin(TOUCH_PENIRQ_GPIO_Port, TOUCH_PENIRQ_Pin), HAL_GetTick());
+
 	 /* tick = get_tick();
 	   * if PIN is RISE
 	   *    HI_tick = tick
@@ -258,14 +260,6 @@ void EXTI9_5_IRQHandler(void)
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(TOUCH_PENIRQ_Pin);
   /* USER CODE BEGIN EXTI9_5_IRQn 1 */
-
-  if (HAL_GPIO_ReadPin(TOUCH_PENIRQ_GPIO_Port, TOUCH_PENIRQ_Pin) == GPIO_PIN_RESET)
-  //Реагируем на события от тача своим событием
-   {
-	  XPT2046_PEN_DOWN_Interrupt_Callback();}
-  else
-  {XPT2046_PEN_UP_Interrupt_Callback();
-  }
 
   /* USER CODE END EXTI9_5_IRQn 1 */
 }
