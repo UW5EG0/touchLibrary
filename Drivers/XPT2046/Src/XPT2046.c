@@ -72,7 +72,7 @@ typedef struct ReferencePoint {
 
 #define XPT2046_OK 0
 #define XPT2046_ERR 1
-#define NO_PRESSURE_CHECK 1
+#define NO_PRESSURE_CHECK 0
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 
@@ -121,6 +121,7 @@ int16_t _yRawOnZeroPoint;
 
 int16_t _xDisplay;
 int16_t _yDisplay;
+float _pressure;
 uint8_t _isWaiting = 0;
 int8_t _typeOfPoint;
 
@@ -249,7 +250,7 @@ void XPT2046_PEN_DOWN_Interrupt_Callback(){
 	_yRawFiltered = 0.0;
 	_z1RawFiltered = 0.0;
 	_z2RawFiltered = 0.0;
-	uint16_t maxScans = 100;
+	uint16_t maxScans = 140;
 	while(maxScans > 0){
 	maxScans--;
 	_xRaw =  XPT2046_SingleScan(CONTROL_CHANNEL_X);
@@ -261,8 +262,8 @@ void XPT2046_PEN_DOWN_Interrupt_Callback(){
 
 	_xRawFiltered = _xRawFiltered*0.98 + _xRaw	*0.02;
 	_yRawFiltered = _yRawFiltered*0.98 + _yRaw	*0.02;
-	_z1RawFiltered = _z1RawFiltered*0.75 + _z1Raw*0.25;
-	_z2RawFiltered = _z2RawFiltered*0.75 + _z2Raw*0.25;
+	_z1RawFiltered = _z1RawFiltered*0.98 + _z1Raw*0.02;
+	_z2RawFiltered = _z2RawFiltered*0.98 + _z2Raw*0.02;
 	_deltaX=_xRawFiltered - _xRawFilteredOld;
 	_deltaY=_yRawFiltered - _yRawFilteredOld;
 	_deltaZ1=_z1RawFiltered - _z1RawFilteredOld;
@@ -272,8 +273,8 @@ void XPT2046_PEN_DOWN_Interrupt_Callback(){
 		}
 	}
 	}
-	if (((max(_z1RawFiltered,_z2RawFiltered) - min(_z1RawFiltered,_z2RawFiltered) < 200)
-		&& (max(_z1RawFiltered,_z2RawFiltered) - min(_z1RawFiltered,_z2RawFiltered) > 3))
+	_pressure = (_xRawFiltered/4096.0)*(_z2RawFiltered/_z1RawFiltered -1);
+	if ((_pressure < 2.5)
 		|| NO_PRESSURE_CHECK) //нажали не ногой и не отпустили
 		{
 		if (_typeOfPoint == POINT_USER){
@@ -296,6 +297,7 @@ void XPT2046_PEN_UP_Interrupt_Callback(){
 void XPT2046_PEN_STILL_Interrupt_Callback() {
 	_endTouchTickMS = XPT2046_GetTick();
 	_lastTouchDuration = _endTouchTickMS - _startTouchTickMS;
+
 }
 /*Принудительная установка точек калибровки*/
 void XPT2046_directSetCalibrationPoint(uint8_t pointIndex, int16_t xDisplay, int16_t yDisplay, uint16_t xADC, uint16_t yADC){
@@ -322,9 +324,14 @@ uint32_t XPT2046_GetTouchPressDuration(){
 void XPT2046_unified_Interrupt_Callback(GPIO_PinState IRQPinStatus, uint32_t IRQMomentTick){
 	if (IRQPinStatus) {
 		_riseTick = IRQMomentTick;
+		{
+			if (!XPT2046_GetIRQPinState()) {
+				XPT2046_PEN_UP_Interrupt_Callback();
+			}
+		}
 	} else {
 		_fallTick = IRQMomentTick;
-		if (_fallTick - _riseTick > 20){
+		if (_fallTick - _riseTick > 50){
 			XPT2046_PEN_DOWN_Interrupt_Callback();
 		} else {
 			XPT2046_PEN_STILL_Interrupt_Callback();

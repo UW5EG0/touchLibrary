@@ -111,9 +111,9 @@ void touch_Pressed(uint16_t x, uint16_t y) {
 	/*выводим координаты на экран*/
 	ssd1306_Clear();
 	ssd1306_SetColor(White);
-	ssd1306_SetCursor(0, 0);
 
-	sprintf(status,"pressed"); //Событие "Нажали"
+	ssd1306_SetCursor(0, 0);
+	sprintf(status,"%f;%f",_z1RawFiltered,_pressure); // Замеры координаты X в пикселях экрана и усредненный результат замера
 	ssd1306_WriteString(status, Font_7x8);
 
 	ssd1306_SetCursor(0, 9);

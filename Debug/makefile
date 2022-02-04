@@ -34,34 +34,34 @@ $(wildcard ../makefile.init) \
 $(wildcard ../makefile.targets) \
 
 
-BUILD_ARTIFACT_NAME := touchTest
+BUILD_ARTIFACT_NAME := touchLibrary
 BUILD_ARTIFACT_EXTENSION := elf
 BUILD_ARTIFACT_PREFIX :=
 BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME)$(if $(BUILD_ARTIFACT_EXTENSION),.$(BUILD_ARTIFACT_EXTENSION),)
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXECUTABLES += \
-touchTest.elf \
+touchLibrary.elf \
 
 SIZE_OUTPUT += \
 default.size.stdout \
 
 OBJDUMP_LIST += \
-touchTest.list \
+touchLibrary.list \
 
 OBJCOPY_BIN += \
-touchTest.bin \
+touchLibrary.bin \
 
 
 # All Target
 all: main-build
 
 # Main-build Target
-main-build: touchTest.elf secondary-outputs
+main-build: touchLibrary.elf secondary-outputs
 
 # Tool invocations
-touchTest.elf: $(OBJS) $(USER_OBJS) /home/user/STM32CubeIDE/workspace/touchTest/STM32F407VETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "touchTest.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/user/STM32CubeIDE/workspace/touchTest/STM32F407VETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="touchTest.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -u _scanf_float -Wl,--start-group -lc -lm -Wl,--end-group
+touchLibrary.elf: $(OBJS) $(USER_OBJS) /home/user/STM32CubeIDE/workspace/touchLibrary/STM32F407VETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "touchLibrary.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/user/STM32CubeIDE/workspace/touchLibrary/STM32F407VETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="touchLibrary.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -u _scanf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -70,19 +70,19 @@ default.size.stdout: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
 	@echo 'Finished building: $@'
 	@echo ' '
 
-touchTest.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "touchTest.list"
+touchLibrary.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "touchLibrary.list"
 	@echo 'Finished building: $@'
 	@echo ' '
 
-touchTest.bin: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "touchTest.bin"
+touchLibrary.bin: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "touchLibrary.bin"
 	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) default.size.stdout touchTest.bin touchTest.elf touchTest.list
+	-$(RM) default.size.stdout touchLibrary.bin touchLibrary.elf touchLibrary.list
 	-@echo ' '
 
 secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST) $(OBJCOPY_BIN)
