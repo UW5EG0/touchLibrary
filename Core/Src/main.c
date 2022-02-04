@@ -135,7 +135,10 @@ void touch_Released(uint32_t duration) {
 	ssd1306_SetColor(White);
     ssd1306_SetCursor(0, 0);
     ssd1306_WriteString(status, Font_7x8);
-    ssd1306_UpdateScreen();
+  ssd1306_SetCursor(0, 8);
+	sprintf(status,"%f;%f",_z1RawFiltered,_pressure); // Замеры координаты X в пикселях экрана и усредненный результат замера
+	ssd1306_WriteString(status, Font_7x8);
+	  ssd1306_UpdateScreen();
 
 	HAL_GPIO_WritePin(LED_B_GPIO_Port, LED_B_Pin, GPIO_PIN_SET); //Гасим контрольный светодиод
 }

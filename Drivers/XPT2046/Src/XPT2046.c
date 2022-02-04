@@ -274,7 +274,7 @@ void XPT2046_PEN_DOWN_Interrupt_Callback(){
 	}
 	}
 	_pressure = (_xRawFiltered/4096.0)*(_z2RawFiltered/_z1RawFiltered -1);
-	if ((_pressure < 2.5)
+	if ((_pressure < 3)
 		|| NO_PRESSURE_CHECK) //нажали не ногой и не отпустили
 		{
 		if (_typeOfPoint == POINT_USER){
@@ -285,6 +285,8 @@ void XPT2046_PEN_DOWN_Interrupt_Callback(){
 			_referencePoints[_typeOfPoint].xADC = (uint16_t) _xRawFiltered;
 			_referencePoints[_typeOfPoint].yADC = (uint16_t) _yRawFiltered;
 		}
+	} else {
+		XPT2046_PEN_UP_Interrupt_Callback();
 	}
 	XPT2046_Enable_Interrupt();
 }
